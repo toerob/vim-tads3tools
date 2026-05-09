@@ -1,0 +1,52 @@
+call plug#begin()
+
+Plug 'tpope/vim-sensible'
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug '/path/to/vim-tads3tools'
+Plug 'liuchengxu/vista.vim'
+
+call plug#end()
+
+
+" ─── TADS3 ────────────────────────────────────────────────────────────────────
+
+" Call setup immediately after plug#end() so autocmds are registered before
+" any FileType event fires (e.g. when opening 'vim file.t' directly).
+" Notification handlers are wired inside CocNvimInit by setup() itself.
+call tads3tools#coc#setup({
+  \ 'server_id':    'tads3',
+  \ 'storage_path': expand('~/.local/share/vim/tads3tools'),
+\ })
+
+
+" ─── General ──────────────────────────────────────────────────────────────────
+
+set rtp+=/opt/homebrew/opt/fzf
+
+" Autocomplete with enter using CoC
+inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm() : "\<CR>"
+  
+set termguicolors
+colorscheme habamax
+set background=dark
+
+let g:vista_default_executive = 'coc'
+let g:vista_sidebar_width     = 35
+let g:vista_echo_cursor_strategy = 'floating_win'
+
+nnoremap <silent> <leader>v :Vista!!<CR>
+
+let g:vista_highlight_whole_line = 1
+autocmd FileType vista setlocal cursorline
+
+autocmd FileType tads3 call s:tads3_lsp_maps()
+function! s:tads3_lsp_maps() abort
+	nmap <buffer> gd <Plug>(coc-definition)
+	nmap <buffer> gr <Plug>(coc-references)
+  nmap <buffer> gl :call tads3tools#coc#follow_link()<CR>
+	nmap <buffer> gD :call CocAction('peekDefinition')<CR>
+	
+        inoremap <buffer> <C-k> <C-r>=CocActionAsync('showSignatureHelp')<CR>
+	nmap <buffer> <leader>ca <Plug>(coc-codeaction-line)
+  	xmap <buffer> <leader>ca <Plug>(coc-codeaction-selected)
+endfunction

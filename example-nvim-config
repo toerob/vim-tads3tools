@@ -1,0 +1,153 @@
+-- Place this file at ~/.config/nvim/init.lua
+-- Neovim equivalent of example-vimrc-config (uses built-in LSP, no coc.nvim).
+
+-- ─── lazy.nvim bootstrap ──────────────────────────────────────────────────────
+local lazypath = vim.fn.stdpath('data') .. '/lazy/lazy.nvim'
+if not (vim.uv or vim.loop).fs_stat(lazypath) then
+  vim.fn.system({
+    'git', 'clone', '--filter=blob:none',
+    'https://github.com/folke/lazy.nvim.git',
+    '--branch=stable', lazypath,
+  })
+end
+vim.opt.rtp:prepend(lazypath)
+
+-- ─── Plugins ──────────────────────────────────────────────────────────────────
+require('lazy').setup({
+
+  -- ── TADS3 ───────────────────────────────────────────────────────────────────
+  {
+    'toerob/vim-tads3tools',
+    -- Must not be lazy-loaded: ftdetect/tads3.vim calls tads3tools#detect_ft to
+    -- identify .t/.h files as tads3, so the plugin must be on rtp before any
+    -- buffer is read. The LSP server itself only starts when a tads3 file opens.
+    lazy = false,
+    config = function()
+      require('tads3tools').setup({
+        -- server_dir is optional if you have run :Tads3InstallServer.
+        -- Set it only if you want to point at a manually cloned server directory:
+        --   server_dir = vim.fn.expand('~/repos/vscode-tads3tools/server'),
+        settings = {
+          tads3 = {
+            include = '/usr/local/share/frobtads/tads3/include/',
+            lib     = '/usr/local/share/frobtads/tads3/lib/',
+          },
+        },
+        on_attach = function(client, bufnr)
+          local map = function(mode, lhs, rhs)
+            vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, silent = true })
+          end
+
+          -- Navigation
+          map('n', 'gd', vim.lsp.buf.definition)
+          map('n', 'gr', vim.lsp.buf.references)
+
+          -- Documentation / signature
+          map('n', 'K',     vim.lsp.buf.hover)
+          map('i', '<C-k>', vim.lsp.buf.signature_help)
+
+          -- Code actions (rename NOT SUPPORTED YET by the server)
+          map({ 'n', 'x' }, '<leader>ca', vim.lsp.buf.code_action)
+
+          -- Diagnostics
+          map('n', '[d', vim.diagnostic.goto_prev)
+          map('n', ']d', vim.diagnostic.goto_next)
+          map('n', '<leader>e', vim.diagnostic.open_float)
+
+          -- Follow #include / document links (equivalent to gl in the coc setup).
+          -- Jumps to the file linked on the current line.
+          map('n', 'gl', function()
+            local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
+            client.request('textDocument/documentLink', params, function(_, links)
+              if not links or #links == 0 then return end
+              local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
+              for _, link in ipairs(links) do
+                if link.range.start.line == lnum and link.target then
+                  vim.cmd('edit ' .. vim.fn.fnameescape((link.target:gsub('^file://', ''))))
+                  return
+                end
+              end
+            end, bufnr)
+          end)
+        end,
+      })
+    end,
+  },
+
+  -- ── Completions ─────────────────────────────────────────────────────────────
+  {
+    'hrsh7th/nvim-cmp',
+    dependencies = {
+      'hrsh7th/cmp-nvim-lsp',      -- LSP completion source
+      'L3MON4D3/LuaSnip',          -- snippet engine (nvim-cmp requires one)
+      'saadparwaiz1/cmp_luasnip',  -- bridge: LuaSnip ↔ nvim-cmp
+    },
+    config = function()
+      local cmp     = require('cmp')
+      local luasnip = require('luasnip')
+      cmp.setup({
+        snippet = {
+          expand = function(args) luasnip.lsp_expand(args.body) end,
+        },
+        mapping = cmp.mapping.preset.insert({
+          ['<Tab>']   = cmp.mapping.select_next_item(),
+          ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+          ['<CR>']    = cmp.mapping.confirm({ select = true }),
+          ['<Esc>']   = cmp.mapping.abort(),
+        }),
+        sources = {
+          { name = 'nvim_lsp' },
+          { name = 'luasnip' },
+        },
+      })
+    end,
+  },
+
+  -- ── Symbols sidebar (equivalent to Vista) ───────────────────────────────────
+  {
+    'stevearc/aerial.nvim',
+    -- nvim-web-devicons provides file-type icons in the sidebar.
+    -- Requires a Nerd Font in your terminal (e.g. JetBrainsMono Nerd Font).
+    dependencies = { 'nvim-tree/nvim-web-devicons' },
+    keys = { { '<leader>v', '<cmd>AerialToggle<cr>', silent = true } },
+    opts = {
+      layout = {
+        default_direction = 'right',
+        min_width         = 35,
+      },
+      highlight_on_hover = true,
+      show_guides        = true,
+    },
+  },
+
+  -- ── Fuzzy finder ────────────────────────────────────────────────────────────
+  { 'junegunn/fzf',     build = './install --bin' },
+  { 'junegunn/fzf.vim' },
+
+  -- ── Statusline ──────────────────────────────────────────────────────────────
+  {
+    'nvim-lualine/lualine.nvim',
+    config = function()
+      require('lualine').setup({
+        sections = {
+          lualine_x = {
+            -- Shows "[tads3 12/48]" while parsing, empty otherwise.
+            -- pcall guards against the component being evaluated before
+            -- vim-tads3tools is lazy-loaded (i.e. before any .t file is opened).
+            function()
+              local ok, t = pcall(require, 'tads3tools')
+              return ok and t.status() or ''
+            end,
+            'encoding', 'fileformat', 'filetype',
+          },
+        },
+      })
+    end,
+  },
+
+})
+
+-- ─── General ──────────────────────────────────────────────────────────────────
+vim.opt.termguicolors = true
+vim.cmd.colorscheme('habamax')
+vim.opt.background = 'dark'
