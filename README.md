@@ -55,5 +55,3 @@ Run `:Tads3InstallServer` once after installing. See [QUICKSTART.md](QUICKSTART.
 ## Requirements
 
 - **Neovim 0.10+** or **Vim 8.2+**
-- The [vscode-tads3tools](https://github.com/toerob/vscode-tads3tools) repository cloned locally
-- **Node.js 18+** (only if the pre-built server binary is unavailable for your platform)
